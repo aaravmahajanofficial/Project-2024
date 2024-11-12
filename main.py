@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request
+from flask import Flask, request, jsonify
 import numpy as np
 import pickle
 import json
@@ -6,12 +6,15 @@ import json
 app = Flask(__name__)
 
 def churn_prediction(tenure, citytier, warehousetohome, gender, hourspendonapp, numberofdeviceregistered, satisfactionscore, maritalstatus, numberofaddress, complain, orderamounthikefromlastyear, couponused, ordercount, daysincelastorder, cashbackamount):
-    with open('end_to_end_deployment/models/churn_prediction_model.pkl', 'rb') as f:
+    # Load the model
+    with open('churn_prediction_model.pkl', 'rb') as f:
         model = pickle.load(f)
 
-    with open("end_to_end_deployment/models/columns.json", "r") as f:
+    # Load the data columns from a JSON file
+    with open("columns.json", "r") as f:
         data_columns = json.load(f)['data_columns']
 
+    # Prepare the input data
     input_data = [
         tenure, citytier, warehousetohome, gender,
         hourspendonapp, numberofdeviceregistered, satisfactionscore, maritalstatus,
@@ -54,47 +57,51 @@ def churn_prediction(tenure, citytier, warehousetohome, gender, hourspendonapp, 
             if f"{col}_{input_dict[col]}" in data_columns:
                 input_array[data_columns.index(f"{col}_{input_dict[col]}")] = 1
 
+    # Predict the probability of churn
     output_probab = model.predict_proba([input_array])[0][1]
     return round(output_probab, 4)  # Round to 4 decimal places
 
-@app.route('/', methods=['GET', 'POST'])
-def index_page():
-    if request.method == 'POST':
-        # Retrieve form data
-        form_data = [
-            request.form['Tenure'],
-            request.form['Citytier'],
-            request.form['Warehousetohome'],
-            request.form['Gender'],
-            request.form['Hourspendonapp'],
-            request.form['Numberofdeviceregistered'],
-            request.form['Satisfactionscore'],
-            request.form['Maritalstatus'],
-            request.form['Numberofaddress'],
-            request.form['Complain'],
-            request.form['Orderamounthikefromlastyear'],
-            request.form['Couponused'],
-            request.form['Ordercount'],
-            request.form['Daysincelastorder'],
-            request.form['Cashbackamount']
-        ]
+@app.route('/predict', methods=['POST'])
+def predict():
+    try:
+        # Get the JSON data from the request
+        data = request.get_json()
 
-        # Convert form data to appropriate types if needed
-        form_data = [int(i) if i.isdigit() else i for i in form_data]
+        # Extract the necessary values from the JSON data
+        form_data = [
+            data['Tenure'],
+            data['Citytier'],
+            data['Warehousetohome'],
+            data['Gender'],
+            data['Hourspendonapp'],
+            data['Numberofdeviceregistered'],
+            data['Satisfactionscore'],
+            data['Maritalstatus'],
+            data['Numberofaddress'],
+            data['Complain'],
+            data['Orderamounthikefromlastyear'],
+            data['Couponused'],
+            data['Ordercount'],
+            data['Daysincelastorder'],
+            data['Cashbackamount']
+        ]
 
         # Get prediction
         output_probab = churn_prediction(*form_data)
 
+        # Determine the churn status
         pred = "Churn" if output_probab > 0.4 else "Not Churn"
 
-        data = {
+        # Return the result as JSON
+        result = {
             'prediction': pred,
-            'predict_probabality': output_probab
+            'predict_probability': output_probab
         }
+        return jsonify(result), 200
 
-        return render_template('result.html', data=data)
-
-    return render_template('index.html')
+    except Exception as e:
+        # If an error occurs, return an error message
+        return jsonify({'error': str(e)}), 400
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True, host='0.0.0.0', port=5000)
