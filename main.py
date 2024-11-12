@@ -59,7 +59,7 @@ def churn_prediction(tenure, citytier, warehousetohome, gender, hourspendonapp, 
 
     # Predict the probability of churn
     output_probab = model.predict_proba([input_array])[0][1]
-    return round(output_probab, 4)  # Round to 4 decimal places
+    return float(round(output_probab, 4))  # Round to 4 decimal places
 
 @app.route('/predict', methods=['POST'])
 def predict():
@@ -95,7 +95,7 @@ def predict():
         # Return the result as JSON
         result = {
             'prediction': pred,
-            'predict_probability': output_probab
+            'predict_probability': float(output_probab)
         }
         return jsonify(result), 200
 
